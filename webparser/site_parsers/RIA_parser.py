@@ -70,9 +70,10 @@ class RIA_Parser(BaseParser):
 
         announce = article_header.find('div', {'class': 'article__announce'})
         if announce:
-            # Skip news with podcast
-            if announce.find('div', {'class': 'audioplayer'}):
-                module_logger.info('Skip articles with podcast %s' % source_url)
+            # Skip news with video, because in most cases they do not carry useful information
+            if announce.find('div', {'class': 'audioplayer'})\
+                    or announce.find('video') or announce.find('iframe'):
+                module_logger.info('Skip articles with video %s' % source_url)
                 return None
 
             announce_image = announce.find('img')
@@ -85,7 +86,13 @@ class RIA_Parser(BaseParser):
 
         publication_date = article_header.find('div', {'class': 'article__info-date'}).find('a')
         publication_date = publication_date.get_text()
-        json_data['publication_date'] = dateparser.parse(publication_date, date_formats=['%H %M %d %m %Y'])
+        publication_date = dateparser.parse(publication_date, date_formats=['%H:%M %d.%m.%Y'])
+
+        json_data['publication_date'] = {'year': publication_date.year,
+                                         'month': publication_date.month,
+                                         'day': publication_date.day,
+                                         'hour': publication_date.hour,
+                                         'minute': publication_date.minute}
 
         title = article_header.find(re.compile("\w"), {'class': 'article__title'})
         title = title.get_text()
@@ -106,6 +113,9 @@ class RIA_Parser(BaseParser):
 
             elif data_type == 'text':
                 text_content = block.get_text()
+                # skip ads telegram channel
+                if 'нашем Телеграм-канале'.lower() in text_content.lower():
+                    continue
                 content = text_content
 
             elif data_type == 'list':
@@ -127,7 +137,16 @@ class RIA_Parser(BaseParser):
                 if not image:
                     continue
                 data_type = 'image'
-                content = {'source': image.attrs['src'], 'title': image.attrs['title']}
+
+                src = image.attrs['src']
+                if not src.startswith('http'):
+                    if image.attrs['data-src']:
+                        src = image.attrs['data-src']
+                    else:
+                        module_logger.warning('Don\'t find src attr for image "%s" for %s'
+                                              % (image.attrs['title'], source_url))
+
+                content = {'source': src, 'title': image.attrs['title']}
 
             elif data_type == 'quote':
                 content = block.get_text()
@@ -162,9 +181,12 @@ class RIA_Parser(BaseParser):
                     content = {'source': image.attrs['src'], 'title': image.attrs['title']}
                     json_data['content'].append({'image': content})
 
-                    text_content = item.find('div', {'class': 'article__photo-inner-desc'})\
-                        .find('div', {'class': 'article__photo-item-text'}).get_text()
-                    json_data['content'].append({'text': text_content})
+                    item = item.find('div', {'class': 'article__photo-inner-desc'})\
+                        .find('div', {'class': 'article__photo-item-text'})
+
+                    for paragraph in item.find_all('p'):
+                        text_content = paragraph.get_text()
+                        json_data['content'].append({'text': text_content})
 
                 continue
 

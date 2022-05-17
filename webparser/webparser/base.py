@@ -192,7 +192,7 @@ class BaseParser():
             response.raise_for_status()
             response_text = response.text
         except HTTPError as ex:
-            raise RequestFailed('Get status code %s.' % response.status_code) from ex
+            raise RequestFailed('Get status code %s.' % response.status_code, url) from ex
         except Timeout as ex:
             raise RequestFailed('Timeout (%s sec) expired.' % self._time_out, url) from ex
         except ConnectionError as ex:

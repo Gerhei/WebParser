@@ -10,7 +10,7 @@ from webparser.base import BaseParser, module_logger
 
 class MIR24_Parser(BaseParser):
     site = 'mir24.tv'
-    url_list_articles = 'https://mir24.tv/rasteniya/simple/list/filter/all'
+    url_list_articles = 'https://mir24.tv/rasteniya/simple/list/filter/all/'
 
     #  Getting all links to articles works in sync mode, which slows down the parsing speed,
     #  but on the other hand, does not load the site with requests, which reduces the likelihood of blocking
@@ -24,23 +24,25 @@ class MIR24_Parser(BaseParser):
             parse_to_date = None
             message = ''
 
+        articles_per_page = 50
+        count_recent = 0
         last_article_date = current_date
         penult_article_date = last_article_date + timedelta(days=1)
-        # while last_article_date != penult_article_date:
-        #     if parse_to_date:
-        #         if last_article_date<parse_to_date:
-        #             break
-        #     penult_article_date = last_article_date
-        #
-        #     get_query = str(last_article_date).replace('-', '')
-        #     html_data = self.get_page(self.url_list_articles+get_query)
-        #     links_to_articles, last_article_date = self.process_parse_list_articles(html_data, parse_to_date)
-        #     list_urls.extend(links_to_articles)
-        #
-        # # return unique values
-        # list_urls = list(set(list_urls))
-        # module_logger.info('On the site %s found %s links to articles%s.'
-        #                    % (self.site, len(list_urls), message))
+        while last_article_date != penult_article_date:
+            if parse_to_date:
+                if last_article_date<parse_to_date:
+                    break
+            penult_article_date = last_article_date
+
+            count_recent += articles_per_page
+            html_data = self.get_page(self.url_list_articles+str(count_recent))
+            links_to_articles, last_article_date = self.process_parse_list_articles(html_data, parse_to_date)
+            list_urls.extend(links_to_articles)
+
+        # return unique values
+        list_urls = list(set(list_urls))
+        module_logger.info('On the site %s found %s links to articles%s.'
+                           % (self.site, len(list_urls), message))
         return list_urls
 
     def process_parse_list_articles(self, html_data, parse_to_date=None, *args, **kwargs):
