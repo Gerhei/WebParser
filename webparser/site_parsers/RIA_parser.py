@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from bs4 import BeautifulSoup
 import dateparser
 
-from webparser.base import BaseParser, module_logger
+from webparser.base import BaseParser
 
 
 class RIA_Parser(BaseParser):
@@ -15,6 +15,8 @@ class RIA_Parser(BaseParser):
     #  Getting all links to articles works in sync mode, which slows down the parsing speed,
     #  but on the other hand, does not load the site with requests, which reduces the likelihood of blocking
     def collect_list_urls(self, parse_for_days=-1):
+        self.module_logger.info('Start collecting all articles urls from %s.'
+                           % (self.site))
         list_urls = []
         current_date = date.today()
         if parse_for_days>=0:
@@ -39,7 +41,7 @@ class RIA_Parser(BaseParser):
 
         # return unique values
         list_urls = list(set(list_urls))
-        module_logger.info('On the site %s found %s links to articles%s.'
+        self.module_logger.info('On the site %s found %s links to articles%s.'
                            % (self.site, len(list_urls), message))
         return list_urls
 
@@ -73,7 +75,7 @@ class RIA_Parser(BaseParser):
             # Skip news with video, because in most cases they do not carry useful information
             if announce.find('div', {'class': 'audioplayer'})\
                     or announce.find('video') or announce.find('iframe'):
-                module_logger.info('Skip articles with video %s' % source_url)
+                self.module_logger.info('Skip articles with video %s' % source_url)
                 return None
 
             announce_image = announce.find('img')
@@ -143,7 +145,7 @@ class RIA_Parser(BaseParser):
                     if image.attrs['data-src']:
                         src = image.attrs['data-src']
                     else:
-                        module_logger.warning('Don\'t find src attr for image "%s" for %s'
+                        self.module_logger.warning('Don\'t find src attr for image "%s" for %s'
                                               % (image.attrs['title'], source_url))
 
                 content = {'source': src, 'title': image.attrs['title']}
@@ -225,7 +227,7 @@ class RIA_Parser(BaseParser):
 
             else:
                 # logging something strange
-                module_logger.warning('Find unknown data type %s for %s' % (data_type, source_url))
+                self.module_logger.warning('Find unknown data type %s for %s' % (data_type, source_url))
                 continue
 
             json_data['content'].append({data_type: content})

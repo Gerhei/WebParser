@@ -15,10 +15,6 @@ from asyncio.exceptions import TimeoutError
 from functools import wraps
 from asyncio.proactor_events import _ProactorBasePipeTransport
 
-
-module_logger = logging.getLogger('webparser')
-module_logger.setLevel(logging.DEBUG)
-
 def silence_event_loop_closed(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -63,6 +59,9 @@ class BaseParser():
         self.headers = headers
         self._time_out = timeout
         self._pause_between_requests = pause_between_requests
+
+        self.module_logger = logging.getLogger(self.__class__.__name__)
+        self.module_logger.setLevel(logging.DEBUG)
         self._setup_loggers(verbosity, *log_handlers)
 
     def _setup_loggers(self, verbosity, *log_handlers):
@@ -71,21 +70,21 @@ class BaseParser():
         console_handler = logging.StreamHandler()
         console_handler.setLevel(console_log_level)
         console_handler.setFormatter(console_format)
-        module_logger.addHandler(console_handler)
+        self.module_logger.addHandler(console_handler)
 
         if len(log_handlers)>0:
             for handler in log_handlers:
-                module_logger.addHandler(handler)
+                self.module_logger.addHandler(handler)
         else:
             file_format = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
             file_handler = logging.FileHandler('webparser.log')
             file_handler.setLevel(logging.INFO)
             file_handler.setFormatter(file_format)
-            module_logger.addHandler(file_handler)
+            self.module_logger.addHandler(file_handler)
 
     async def _parse_list_pages(self, list_urls):
         """ For a given list of urls, return parsed data for each of the pages """
-        module_logger.info('[%s] Started parsing pages from the list of urls.' % self.__class__.__name__)
+        self.module_logger.info('[%s] Started parsing pages from the list of urls.' % self.__class__.__name__)
         self.parse_info = {'num_pages': len(list_urls), 'processed': 0, 'collected': 0, 'skipped': 0}
         with requests.Session() as session:
             json_page_data_list = await asyncio.gather(*[self._parse_page(links, session)
@@ -96,7 +95,7 @@ class BaseParser():
             if isinstance(json_page_data, dict):
                 json_data[links] = json_page_data
         self._json_list_pages = json_data
-        module_logger.info('[%s] Finished parsing pages from the list of urls. Successfully collected '
+        self.module_logger.info('[%s] Finished parsing pages from the list of urls. Successfully collected '
                            '%s pages out of %s (%s skipped).'
                            % (self.__class__.__name__, self.parse_info['collected'],
                               self.parse_info['num_pages'], self.parse_info['skipped']))
@@ -111,10 +110,10 @@ class BaseParser():
             if not isinstance(html_data, str):
                 raise ReturnNotHTML(url, html_data)
         except RequestFailed as ex:
-            module_logger.error(ex.__str__())
+            self.module_logger.error(ex.__str__())
             return None
         except ReturnNotHTML as ex:
-            module_logger.error(ex.__str__())
+            self.module_logger.error(ex.__str__())
             return None
         else:
             json_data = self.process_parse_page(html_data, source_url=url)
@@ -125,7 +124,7 @@ class BaseParser():
             return json_data
         finally:
             self.parse_info['processed'] += 1
-            module_logger.debug('[%s] Processed pages: %s/%s'
+            self.module_logger.debug('[%s] Processed pages: %s/%s'
                                 % (self.__class__.__name__, self.parse_info['processed'], self.parse_info['num_pages']))
 
     def parse(self, list_urls):
@@ -180,9 +179,7 @@ class BaseParser():
 
     # Sync version _get_page for outer use
     def get_page(self, url, session=None):
-        """ Make a request by applying all the request parameters specified in the class (headers for example).
-            Return html text.
-        """
+        """ Make a request by applying all the request parameters specified in the class (headers for example) """
         try:
             if session:
                 request_object = session
