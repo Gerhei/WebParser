@@ -190,6 +190,7 @@ class BaseParser():
                 request_object = requests
             response = request_object.get(url, headers=self.headers, timeout=self._time_out)
             response.raise_for_status()
+            response.encoding = 'utf-8'
             response_text = response.text
         except HTTPError as ex:
             raise RequestFailed('Get status code %s.' % response.status_code, url) from ex
